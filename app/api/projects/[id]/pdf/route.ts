@@ -19,8 +19,13 @@ function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace("#", "");
   return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
 }
-function lighten(rgb: [number,number,number], amount = 0.85): [number,number,number] {
-  return rgb.map(c => Math.round(c + (255-c)*amount)) as [number,number,number];
+function rgbToHex(rgb: [number,number,number]): string {
+  return "#" + rgb.map(c => c.toString(16).padStart(2, "0")).join("");
+}
+function lightenHex(hex: string, amount: number): string {
+  const rgb = hexToRgb(hex);
+  const lit = rgb.map(c => Math.round(c + (255 - c) * amount)) as [number,number,number];
+  return rgbToHex(lit);
 }
 
 export async function GET(
@@ -60,8 +65,11 @@ export async function GET(
   const cliSlug  = project.clientName.replace(/\s+/g, "_").replace(/[^A-Za-z0-9_]/g, "");
   const filename = `${epcSlug}_${cliSlug}_SolarProposal_${dateStr}.pdf`;
 
-  const brand    = hexToRgb(epc.brandColor ?? "#0d6e74");
-  const brandL   = lighten(brand, 0.88);
+  const brandHex  = epc.brandColor ?? "#0d6e74";
+  const brand      = hexToRgb(brandHex);   // [r,g,b] — only used where PDFKit accepts arrays
+  const brandL     = lightenHex(brandHex, 0.88);  // hex string — safe everywhere
+  const brandL35   = lightenHex(brandHex, 0.35);
+  const brandL60   = lightenHex(brandHex, 0.60);
 
   const fmt = (n: number, dec = 0) =>
     new Intl.NumberFormat("en-EG", { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(n);
@@ -175,7 +183,7 @@ export async function GET(
 
     // Bilingual rationale box
     const ratY = divY + 16;
-    doc.rect(ML, ratY, CW, 78).fillAndStroke(brandL, lighten(brand, 0.6));
+    doc.rect(ML, ratY, CW, 78).fillAndStroke(brandL, brandL60);
     const noteEN = (project as any).projectNote
       || `This proposal presents the financial and environmental case for a ${fmt(project.systemSizeKwp, 1)} kWp solar installation at ${project.siteName}, ${project.city}, delivering significant electricity cost savings and a strong return on investment over a ${project.analysisPeriod}-year analysis period.`;
     doc.font("Helvetica").fontSize(9.5).fillColor("#1a5c60")
@@ -214,9 +222,9 @@ export async function GET(
     const kpiW = (CW - 12) / 4;
     kpiItems.forEach((k, i) => {
       const kx = ML + i * (kpiW + 4);
-      doc.rect(kx, y2, kpiW, 70).fillAndStroke(brandL, lighten(brand, 0.6));
-      doc.font("Helvetica").fontSize(22).fillColor(brand).text(k.icon, kx, y2 + 8, { width: kpiW, align: "center" });
-      doc.font("Helvetica-Bold").fontSize(13).fillColor(brand).text(k.value, kx, y2 + 33, { width: kpiW, align: "center" });
+      doc.rect(kx, y2, kpiW, 70).fillAndStroke(brandL, brandL60);
+      doc.font("Helvetica").fontSize(22).fillColor(brandHex).text(k.icon, kx, y2 + 8, { width: kpiW, align: "center" });
+      doc.font("Helvetica-Bold").fontSize(13).fillColor(brandHex).text(k.value, kx, y2 + 33, { width: kpiW, align: "center" });
       doc.font("Helvetica").fontSize(8).fillColor("#666666").text(k.label, kx, y2 + 52, { width: kpiW, align: "center" });
     });
     y2 += 86;
@@ -289,7 +297,7 @@ export async function GET(
     // Self-consumed segment (lighter)
     doc.rect(chartX, chartY, barScW, chartH).fill(brand);
     // Exported segment (tinted)
-    doc.rect(chartX + barScW, chartY, barExpW, chartH).fill(lighten(brand, 0.35));
+    doc.rect(chartX + barScW, chartY, barExpW, chartH).fill(brandL35);
 
     // If consumption given, show remaining grid dependency
     if (conKwh > 0 && conKwh > selfConsumed) {
@@ -316,7 +324,7 @@ export async function GET(
     // Legend
     doc.rect(ML, y3, 10, 10).fill(brand);
     doc.font("Helvetica").fontSize(8).fillColor("#444444").text("Self-consumed", ML + 13, y3 + 1);
-    doc.rect(ML + 100, y3, 10, 10).fill(lighten(brand, 0.35));
+    doc.rect(ML + 100, y3, 10, 10).fill(brandL35);
     doc.font("Helvetica").fontSize(8).fillColor("#444444").text("Exported to grid", ML + 113, y3 + 1);
     if (conKwh > 0) {
       doc.rect(ML + 220, y3, 10, 10).fill("#cccccc");
@@ -335,7 +343,7 @@ export async function GET(
     energyKpis.forEach((k, i) => {
       const ex = ML + i * (eBoxW + 3);
       doc.rect(ex, y3, eBoxW, 52).fillAndStroke(i % 2 === 0 ? "#f7f7f6" : brandL, "#eeeeee");
-      doc.font("Helvetica-Bold").fontSize(14).fillColor(brand).text(k.value, ex, y3 + 8, { width: eBoxW, align: "center" });
+      doc.font("Helvetica-Bold").fontSize(14).fillColor(brandHex).text(k.value, ex, y3 + 8, { width: eBoxW, align: "center" });
       doc.font("Helvetica-Bold").fontSize(8).fillColor("#444444").text(k.label, ex, y3 + 28, { width: eBoxW, align: "center" });
       doc.font("Helvetica").fontSize(7.5).fillColor("#888888").text(k.sub, ex, y3 + 39, { width: eBoxW, align: "center" });
     });
@@ -357,7 +365,7 @@ export async function GET(
       `Over ${project.analysisPeriod} years (including tariff escalation & panel degradation), the cumulative cashflow reaches EGP ${fmt(result.cumulativeCashflows[result.cumulativeCashflows.length-1],0)}.`,
     ].filter(Boolean) as string[];
 
-    doc.rect(ML, y3 - 4, CW, savingsLines.length * 19 + 16).fillAndStroke("#f0f9f9", lighten(brand, 0.6));
+    doc.rect(ML, y3 - 4, CW, savingsLines.length * 19 + 16).fillAndStroke("#f0f9f9", brandL60);
     savingsLines.forEach((line, i) => {
       doc.font(i === savingsLines.length - 1 ? "Helvetica-Bold" : "Helvetica").fontSize(9.5).fillColor("#1a5c60")
         .text(line, ML + 10, y3 + 4 + i * 19, { width: CW - 20 });
@@ -367,7 +375,7 @@ export async function GET(
     // Arabic savings summary
     if (arabicAvailable) {
       const arSavings = `يُنتج هذا النظام ${fmt(prodY1,0)} ك.و.س سنويًا، يُستهلك منها ${fmt(selfConsumed,0)} ك.و.س ذاتيًا مما يُوفِّر EGP ${fmt(gridSavings,0)} في السنة الأولى${exportRevenue > 0 ? `، بالإضافة إلى EGP ${fmt(exportRevenue,0)} من عائد التغذية العكسية` : ""}. ويُتوقَّع أن يُحقِّق المشروع العائد على الاستثمار خلال ${result.simplePayback !== null ? fmt(result.simplePayback,1) : "N/A"} سنوات.`;
-      doc.rect(ML, y3 - 2, CW, 36).fill(brandL);
+      doc.rect(ML, y3 - 2, CW, 36).fill(brandL);  // brandL is now hex string — OK
       doc.font("Amiri").fontSize(10).fillColor("#1a5c60")
         .text(arSavings, ML + 10, y3 + 4, { width: CW - 20, features: ["rtla"] });
       y3 += 42;
@@ -447,7 +455,8 @@ export async function GET(
       const py = y4 + chartH4 * ((maxVal - cum) / range);
       if (!started) { doc.moveTo(px, py); started = true; } else { doc.lineTo(px, py); }
     });
-    doc.lineWidth(2).stroke("#f39c12");
+    doc.lineWidth(2);
+    doc.stroke("#f39c12");
     doc.lineWidth(1);
     doc.restore();
 
@@ -458,7 +467,9 @@ export async function GET(
       doc.save();
       doc.rect(chartX4, y4, chartW4, chartH4).clip();
       for (let dy = y4; dy < y4 + chartH4; dy += 7) {
-        doc.moveTo(pbXc, dy).lineTo(pbXc, dy + 4).lineWidth(1.5).stroke("#27ae60");
+        doc.moveTo(pbXc, dy).lineTo(pbXc, dy + 4);
+        doc.lineWidth(1.5);
+        doc.stroke("#27ae60");
       }
       doc.lineWidth(1);
       doc.restore();
@@ -477,7 +488,9 @@ export async function GET(
     const legY = y4 + chartH4 + 16;
     doc.rect(chartX4, legY, 10, 9).fill(brand);
     doc.font("Helvetica").fontSize(7.5).fillColor("#555").text("Annual CF", chartX4 + 13, legY + 1);
-    doc.moveTo(chartX4 + 75, legY + 4).lineTo(chartX4 + 88, legY + 4).lineWidth(2).stroke("#f39c12");
+    doc.moveTo(chartX4 + 75, legY + 4).lineTo(chartX4 + 88, legY + 4);
+    doc.lineWidth(2);
+    doc.stroke("#f39c12");
     doc.lineWidth(1);
     doc.font("Helvetica").fontSize(7.5).fillColor("#555").text("Cumulative CF", chartX4 + 92, legY + 1);
     if (result.simplePayback !== null) {
@@ -501,7 +514,7 @@ export async function GET(
 
     const drawTableHeader = (y: number) => {
       doc.rect(ML, y, CW, 16).fill(brandL);
-      doc.font("Helvetica-Bold").fontSize(8.5).fillColor(brand);
+      doc.font("Helvetica-Bold").fontSize(8.5).fillColor(brandHex);
       headers5.forEach((h, i) => doc.text(h, cols5[i], y + 4, { width: colW5[i] }));
       return y + 18;
     };
