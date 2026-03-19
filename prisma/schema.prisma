@@ -1,19 +1,18 @@
 // Prisma schema — Solar ROI Egypt
 // Database: PostgreSQL (Neon, Supabase, or any Postgres provider)
-// Local dev: set DATABASE_URL in .env to your Postgres connection string
-// Vercel: set DATABASE_URL in project environment variables
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Generate the client into a path that Vercel never caches between builds.
+  // This guarantees the correct query engine (libquery_engine-*.so.node) is
+  // always freshly generated for the current provider on every deploy.
+  output        = "../node_modules/.prisma/client"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  // Neon (and some other providers) require a non-pooling URL for migrations.
-  // If you use Neon, also set DIRECT_URL in your env:
-  //   directUrl = env("DIRECT_URL")
-  // and uncomment the line above. For a basic Neon setup the pooled URL works fine.
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Epc {
