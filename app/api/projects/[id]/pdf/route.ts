@@ -175,7 +175,7 @@ export async function GET(
 
     // Bilingual rationale box
     const ratY = divY + 16;
-    doc.rect(ML, ratY, CW, 78).fill(brandL).stroke(lighten(brand, 0.6));
+    doc.rect(ML, ratY, CW, 78).fillAndStroke(brandL, lighten(brand, 0.6));
     const noteEN = (project as any).projectNote
       || `This proposal presents the financial and environmental case for a ${fmt(project.systemSizeKwp, 1)} kWp solar installation at ${project.siteName}, ${project.city}, delivering significant electricity cost savings and a strong return on investment over a ${project.analysisPeriod}-year analysis period.`;
     doc.font("Helvetica").fontSize(9.5).fillColor("#1a5c60")
@@ -214,7 +214,7 @@ export async function GET(
     const kpiW = (CW - 12) / 4;
     kpiItems.forEach((k, i) => {
       const kx = ML + i * (kpiW + 4);
-      doc.rect(kx, y2, kpiW, 70).fill(brandL).stroke(lighten(brand, 0.6));
+      doc.rect(kx, y2, kpiW, 70).fillAndStroke(brandL, lighten(brand, 0.6));
       doc.font("Helvetica").fontSize(22).fillColor(brand).text(k.icon, kx, y2 + 8, { width: kpiW, align: "center" });
       doc.font("Helvetica-Bold").fontSize(13).fillColor(brand).text(k.value, kx, y2 + 33, { width: kpiW, align: "center" });
       doc.font("Helvetica").fontSize(8).fillColor("#666666").text(k.label, kx, y2 + 52, { width: kpiW, align: "center" });
@@ -334,7 +334,7 @@ export async function GET(
     ];
     energyKpis.forEach((k, i) => {
       const ex = ML + i * (eBoxW + 3);
-      doc.rect(ex, y3, eBoxW, 52).fill(i % 2 === 0 ? "#f7f7f6" : brandL).stroke("#eeeeee");
+      doc.rect(ex, y3, eBoxW, 52).fillAndStroke(i % 2 === 0 ? "#f7f7f6" : brandL, "#eeeeee");
       doc.font("Helvetica-Bold").fontSize(14).fillColor(brand).text(k.value, ex, y3 + 8, { width: eBoxW, align: "center" });
       doc.font("Helvetica-Bold").fontSize(8).fillColor("#444444").text(k.label, ex, y3 + 28, { width: eBoxW, align: "center" });
       doc.font("Helvetica").fontSize(7.5).fillColor("#888888").text(k.sub, ex, y3 + 39, { width: eBoxW, align: "center" });
@@ -357,7 +357,7 @@ export async function GET(
       `Over ${project.analysisPeriod} years (including tariff escalation & panel degradation), the cumulative cashflow reaches EGP ${fmt(result.cumulativeCashflows[result.cumulativeCashflows.length-1],0)}.`,
     ].filter(Boolean) as string[];
 
-    doc.rect(ML, y3 - 4, CW, savingsLines.length * 19 + 16).fill("#f0f9f9").stroke(lighten(brand, 0.6));
+    doc.rect(ML, y3 - 4, CW, savingsLines.length * 19 + 16).fillAndStroke("#f0f9f9", lighten(brand, 0.6));
     savingsLines.forEach((line, i) => {
       doc.font(i === savingsLines.length - 1 ? "Helvetica-Bold" : "Helvetica").fontSize(9.5).fillColor("#1a5c60")
         .text(line, ML + 10, y3 + 4 + i * 19, { width: CW - 20 });
@@ -407,7 +407,7 @@ export async function GET(
     const chartH4 = 200;
     const n4      = result.annualCashflows.length;
 
-    doc.rect(chartX4, y4, chartW4, chartH4).fill("#fafafa").stroke("#e5e5e5");
+    doc.rect(chartX4, y4, chartW4, chartH4).fillAndStroke("#fafafa", "#e5e5e5");
 
     const allVals = [...result.annualCashflows, ...result.cumulativeCashflows];
     const maxVal  = Math.max(...allVals, 0);
