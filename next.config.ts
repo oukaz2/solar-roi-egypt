@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ["pdfkit", "@prisma/client", "prisma"],
-  },
+  // pdfkit and prisma are CommonJS — must stay on the server bundle
+  serverExternalPackages: ["pdfkit", "@prisma/client", "prisma"],
 };
 
 export default nextConfig;

@@ -3,7 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
   try {
     const formData = await req.formData();
     const file = formData.get("logo") as File | null;
@@ -16,12 +20,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     await mkdir(uploadsDir, { recursive: true });
 
     const ext  = file.name.split(".").pop() || "png";
-    const name = `epc-${params.id}-${Date.now()}.${ext}`;
+    const name = `epc-${id}-${Date.now()}.${ext}`;
     await writeFile(path.join(uploadsDir, name), buffer);
 
     const logoUrl = `/uploads/${name}`;
     const epc = await prisma.epc.update({
-      where: { id: Number(params.id) },
+      where: { id: Number(id) },
       data: { logoUrl },
     });
     return NextResponse.json({ logoUrl, epc });

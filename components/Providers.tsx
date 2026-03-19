@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, createContext, useContext } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { EpcData } from "@/lib/types";
 
 // ── Theme ────────────────────────────────────────────────────────────────────
@@ -72,9 +73,21 @@ export const useEpc = () => useContext(EpcCtx);
 
 // ── Combined providers ────────────────────────────────────────────────────────
 export function Providers({ children }: { children: React.ReactNode }) {
+  // Create QueryClient inside component so it's stable per-session and SSR-safe
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 30_000,
+        retry: 1,
+      },
+    },
+  }));
+
   return (
-    <ThemeProvider>
-      <EpcProvider>{children}</EpcProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <EpcProvider>{children}</EpcProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
