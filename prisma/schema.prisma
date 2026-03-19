@@ -1,11 +1,8 @@
-// Prisma schema — Solar ROI Egypt
+// Prisma schema — Solar ROI Egypt  (V3)
 // Database: PostgreSQL (Neon, Supabase, or any Postgres provider)
 
 generator client {
   provider      = "prisma-client-js"
-  // Generate the client into a path that Vercel never caches between builds.
-  // This guarantees the correct query engine (libquery_engine-*.so.node) is
-  // always freshly generated for the current provider on every deploy.
   output        = "../node_modules/.prisma/client"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
@@ -32,38 +29,50 @@ model Project {
   epcId              Int
   epc                Epc      @relation(fields: [epcId], references: [id])
 
-  // Client info
+  // ── Project metadata (V3) ──────────────────────────────────────────────
+  projectName        String?         // e.g. "Solar ROI Study – Cairo Textile"
+  siteAddress        String?         // full address
+  gpsCoords          String?         // optional "30.0626° N, 31.2497° E"
+  projectNote        String?         // short EPC rationale / sales note
+
+  // ── Client info ────────────────────────────────────────────────────────
   clientName         String
   siteName           String
   city               String
 
-  // System design
+  // ── System design ──────────────────────────────────────────────────────
   systemSizeKwp      Float
   capexPerKwp        Float
   oAndMPercent       Float    @default(1.0)
 
-  // Production
+  // ── Optional technical BOM (V3) ────────────────────────────────────────
+  moduleModel        String?         // e.g. "JA Solar JAM72S30 550W"
+  inverterModel      String?         // e.g. "Huawei SUN2000-215KTL"
+  storageModel       String?         // e.g. "CATL EnerOne"
+  storageCapacityKwh Float?          // kWh
+
+  // ── Production ─────────────────────────────────────────────────────────
   region             String
   specificYield      Float
 
-  // Tariffs (V2: grid avoidance tariff + export tariff)
+  // ── Tariffs ────────────────────────────────────────────────────────────
   tariffType         String
-  tariffValue        Float          // grid purchase tariff (avoided cost)
-  exportTariff       Float          @default(0.0)  // EGP/kWh for surplus export
+  tariffValue        Float
+  exportTariff       Float           @default(0.0)
   escalationScenario String
 
-  // Self-consumption (V2)
-  consumptionKwh     Float?         // annual site consumption in kWh (optional)
-  selfConsumptionRatio Float        @default(0.8)  // fraction of min(prod,cons) used on-site
+  // ── Self-consumption ───────────────────────────────────────────────────
+  consumptionKwh     Float?
+  selfConsumptionRatio Float         @default(0.8)
 
-  // Financing
+  // ── Financing ──────────────────────────────────────────────────────────
   financingMode      String   @default("cash")
-  financingParams    String?  // JSON string: { loanShare, interestRate, tenorYears }
+  financingParams    String?
 
-  // Analysis
+  // ── Analysis ───────────────────────────────────────────────────────────
   analysisPeriod     Int      @default(25)
 
-  // Computed results (stored for fast retrieval)
+  // ── Computed results ───────────────────────────────────────────────────
   simplePayback      Float?
   npv                Float?
   irr                Float?

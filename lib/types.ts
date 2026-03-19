@@ -1,4 +1,4 @@
-// Shared types for client + server
+// Shared types for client + server  (V3)
 
 export interface EpcData {
   id:           number;
@@ -12,55 +12,51 @@ export interface EpcData {
 }
 
 export interface ProjectData {
-  id:                  number;
-  epcId:               number;
-  clientName:          string;
-  siteName:            string;
-  city:                string;
-  systemSizeKwp:       number;
-  capexPerKwp:         number;
-  oAndMPercent:        number;
-  region:              string;
-  specificYield:       number;
-  tariffType:          string;
-  tariffValue:         number;
-  exportTariff:        number;
-  escalationScenario:  string;
-  consumptionKwh:      number;
+  id:                   number;
+  epcId:                number;
+  // V3 metadata
+  projectName?:         string | null;
+  siteAddress?:         string | null;
+  gpsCoords?:           string | null;
+  projectNote?:         string | null;
+  // Client
+  clientName:           string;
+  siteName:             string;
+  city:                 string;
+  // System
+  systemSizeKwp:        number;
+  capexPerKwp:          number;
+  oAndMPercent:         number;
+  // Optional BOM
+  moduleModel?:         string | null;
+  inverterModel?:       string | null;
+  storageModel?:        string | null;
+  storageCapacityKwh?:  number | null;
+  // Production
+  region:               string;
+  specificYield:        number;
+  // Tariffs
+  tariffType:           string;
+  tariffValue:          number;
+  exportTariff:         number;
+  escalationScenario:   string;
+  // Self-consumption
+  consumptionKwh:       number;
   selfConsumptionRatio: number;
-  financingMode:       string;
-  financingParams:     string | null;
-  analysisPeriod:      number;
-  simplePayback:       number | null;
-  npv:                 number | null;
-  irr:                 number | null;
-  annualProduction:    number | null;
-  createdAt:           string;
+  // Financing
+  financingMode:        string;
+  financingParams:      string | null;
+  analysisPeriod:       number;
+  // Results
+  simplePayback:        number | null;
+  npv:                  number | null;
+  irr:                  number | null;
+  annualProduction:     number | null;
+  createdAt:            string;
 }
 
 export interface LoanParams {
   loanShare:    number;
   interestRate: number;
   tenorYears:   number;
-}
-
-export interface ProjectFormValues {
-  clientName:           string;
-  siteName:             string;
-  city:                 string;
-  systemSizeKwp:        number;
-  capexPerKwp:          number;
-  oAndMPercent:         number;
-  region:               string;
-  tariffType:           string;
-  customTariff?:        number;
-  exportTariff?:        number;
-  escalationScenario:   string;
-  consumptionKwh?:      number;
-  selfConsumptionRatio?: number;
-  financingMode:        "cash" | "loan";
-  loanShare?:           number;
-  interestRate?:        number;
-  tenorYears?:          number;
-  analysisPeriod:       number;
 }

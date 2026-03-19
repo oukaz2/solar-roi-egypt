@@ -17,6 +17,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { useEpc } from "@/components/Providers";
 import { runFinancialEngine } from "@/lib/financialEngine";
 import {
@@ -26,7 +28,21 @@ import {
   ESCALATION_PRESETS,
 } from "@/lib/constants";
 import type { ProjectData, LoanParams } from "@/lib/types";
-import { Download, ArrowLeft, TrendingUp, Clock, DollarSign, BarChart2, Leaf, Zap } from "lucide-react";
+import {
+  Download,
+  ArrowLeft,
+  TrendingUp,
+  Clock,
+  DollarSign,
+  BarChart2,
+  Leaf,
+  Zap,
+  MapPin,
+  Navigation,
+  Package,
+  FileText,
+  Info,
+} from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt(n: number, decimals = 0) {
@@ -43,15 +59,17 @@ function KpiCard({
   unit,
   sub,
   icon: Icon,
+  highlight,
 }: {
   label: string;
   value: string;
   unit?: string;
   sub?: string;
   icon: React.ElementType;
+  highlight?: boolean;
 }) {
   return (
-    <Card>
+    <Card className={highlight ? "border-primary/30 bg-primary/5" : ""}>
       <CardContent className="pt-5 pb-4">
         <div className="flex items-start justify-between mb-2">
           <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
@@ -80,8 +98,22 @@ function KpiCard({
   );
 }
 
+// ─── Info Row ─────────────────────────────────────────────────────────────────
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <tr>
+      <td className="py-1.5 text-muted-foreground text-xs w-44">{label}</td>
+      <td className="py-1.5 text-right font-mono text-xs font-medium">{value}</td>
+    </tr>
+  );
+}
+
 // ─── Chart Tooltip ────────────────────────────────────────────────────────────
-function CustomTooltip({ active, payload, label }: {
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
   active?: boolean;
   payload?: Array<{ name: string; value: number; color: string }>;
   label?: number;
@@ -124,15 +156,18 @@ export default function ProjectResultsPage({
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 max-w-4xl">
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-28" />
           ))}
         </div>
         <Skeleton className="h-72 w-full" />
-        <Skeleton className="h-48 w-full" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
+        </div>
       </div>
     );
   }
@@ -148,9 +183,9 @@ export default function ProjectResultsPage({
   // Re-run engine client-side for chart data
   const loanParams: LoanParams | undefined =
     project.financingMode === "loan" && project.financingParams
-      ? (typeof project.financingParams === "string"
-          ? JSON.parse(project.financingParams)
-          : project.financingParams)
+      ? typeof project.financingParams === "string"
+        ? JSON.parse(project.financingParams)
+        : project.financingParams
       : undefined;
 
   const engineResult = runFinancialEngine({
@@ -164,9 +199,9 @@ export default function ProjectResultsPage({
     loanParams,
     analysisPeriod:       project.analysisPeriod,
     discountRate:         activeEpc?.discountRate ?? 0.11,
-    consumptionKwh:       (project as any).consumptionKwh ?? 0,
-    selfConsumptionRatio: (project as any).selfConsumptionRatio ?? 0.8,
-    exportTariff:         (project as any).exportTariff ?? 0,
+    consumptionKwh:       project.consumptionKwh ?? 0,
+    selfConsumptionRatio: project.selfConsumptionRatio ?? 0.8,
+    exportTariff:         project.exportTariff ?? 0,
   });
 
   const chartData = engineResult.annualCashflows.map((cf, i) => ({
@@ -176,6 +211,20 @@ export default function ProjectResultsPage({
   }));
 
   const brandColor = activeEpc?.brandColor ?? "#0d6e74";
+  const selfConsumptionRatio = project.selfConsumptionRatio ?? 0.8;
+  const exportTariff = project.exportTariff ?? 0;
+
+  // V3 optional fields
+  const hasBom =
+    project.moduleModel ||
+    project.inverterModel ||
+    project.storageModel ||
+    project.storageCapacityKwh;
+  const hasSiteDetails =
+    project.projectName ||
+    project.siteAddress ||
+    project.gpsCoords ||
+    project.projectNote;
 
   const handleDownloadPdf = async () => {
     const res = await fetch(`/api/projects/${id}/pdf`);
@@ -188,18 +237,19 @@ export default function ProjectResultsPage({
     const a = document.createElement("a");
     a.href = url;
     const today = new Date().toISOString().split("T")[0].replace(/-/g, "");
-    a.download = `SolarProposal_${project.clientName}_${today}.pdf`;
+    const filename = project.projectName
+      ? `${project.projectName.replace(/\s+/g, "_")}_Proposal_${today}.pdf`
+      : `SolarProposal_${project.clientName}_${today}.pdf`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const selfConsumptionRatio = (project as any).selfConsumptionRatio ?? 0.8;
-  const exportTariff         = (project as any).exportTariff ?? 0;
-
   return (
     <div className="max-w-4xl space-y-6">
+
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Link href="/projects">
@@ -213,12 +263,38 @@ export default function ProjectResultsPage({
               </Button>
             </Link>
           </div>
-          <h1 className="text-xl font-semibold">{project.clientName}</h1>
-          <p className="text-sm text-muted-foreground">
+
+          {/* Project name (V3) — shown above client name if present */}
+          {project.projectName && (
+            <h1 className="text-xl font-semibold leading-tight">
+              {project.projectName}
+            </h1>
+          )}
+
+          <h2 className={`font-semibold leading-tight ${project.projectName ? "text-base text-muted-foreground" : "text-xl"}`}>
+            {project.clientName}
+          </h2>
+
+          <p className="text-sm text-muted-foreground mt-0.5">
             {project.siteName} · {project.city} ·{" "}
             {fmt(project.systemSizeKwp, 1)} kWp
           </p>
+
+          {/* Site address (V3) */}
+          {project.siteAddress && (
+            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+              <MapPin className="w-3 h-3 shrink-0" />
+              {project.siteAddress}
+              {project.gpsCoords && (
+                <span className="ml-1 text-muted-foreground/60 flex items-center gap-0.5">
+                  <Navigation className="w-3 h-3" />
+                  {project.gpsCoords}
+                </span>
+              )}
+            </p>
+          )}
         </div>
+
         <Button
           className="gap-2 shrink-0"
           onClick={handleDownloadPdf}
@@ -230,7 +306,19 @@ export default function ProjectResultsPage({
         </Button>
       </div>
 
-      {/* ── KPI Cards ── */}
+      {/* ── Project Note (V3 EPC rationale) ── */}
+      {project.projectNote && (
+        <Card className="border-blue-200/60 bg-blue-50/40 dark:bg-blue-950/20 dark:border-blue-800/40">
+          <CardContent className="pt-4 pb-4 flex gap-3">
+            <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-foreground/80 leading-relaxed">
+              {project.projectNote}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Financial KPI Cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <KpiCard
           label="Simple Payback"
@@ -242,12 +330,14 @@ export default function ProjectResultsPage({
           unit="yrs"
           sub="from first year"
           icon={Clock}
+          highlight
         />
         <KpiCard
           label="NPV"
           value={`EGP ${fmt(engineResult.npv / 1e6, 2)}M`}
           sub={`at ${((activeEpc?.discountRate ?? 0.11) * 100).toFixed(0)}% discount`}
           icon={DollarSign}
+          highlight
         />
         <KpiCard
           label="IRR"
@@ -258,6 +348,7 @@ export default function ProjectResultsPage({
           }
           sub="internal rate of return"
           icon={TrendingUp}
+          highlight
         />
         <KpiCard
           label="Production Y1"
@@ -279,28 +370,46 @@ export default function ProjectResultsPage({
         />
       </div>
 
-      {/* ── Self-consumption breakdown ── */}
-      {((project as any).consumptionKwh > 0 || selfConsumptionRatio < 1) && (
+      {/* ── Energy Split ── */}
+      {((project.consumptionKwh ?? 0) > 0 || selfConsumptionRatio < 1) && (
         <Card>
           <CardHeader className="pb-2 px-5 pt-5">
-            <CardTitle className="text-sm font-semibold">Energy Split (Year 1)</CardTitle>
+            <CardTitle className="text-sm font-semibold">
+              Energy Split — Year 1
+            </CardTitle>
           </CardHeader>
           <CardContent className="px-5 pb-5">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <div className="text-xs text-muted-foreground mb-1">Total Production</div>
-                <div className="text-lg font-mono font-semibold text-primary">{fmt(engineResult.annualProductionY1, 0)} kWh</div>
+                <div className="text-xs text-muted-foreground mb-1">
+                  Total Production
+                </div>
+                <div className="text-lg font-mono font-semibold text-primary">
+                  {fmt(engineResult.annualProductionY1, 0)} kWh
+                </div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground mb-1">Self-Consumed</div>
-                <div className="text-lg font-mono font-semibold text-green-600">{fmt(engineResult.selfConsumedKwhY1, 0)} kWh</div>
-                <div className="text-xs text-muted-foreground">avoids EGP {fmt(project.tariffValue, 3)}/kWh</div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Exported</div>
-                <div className="text-lg font-mono font-semibold text-blue-600">{fmt(engineResult.exportedKwhY1, 0)} kWh</div>
+                <div className="text-xs text-muted-foreground mb-1">
+                  Self-Consumed
+                </div>
+                <div className="text-lg font-mono font-semibold text-green-600">
+                  {fmt(engineResult.selfConsumedKwhY1, 0)} kWh
+                </div>
                 <div className="text-xs text-muted-foreground">
-                  {exportTariff > 0 ? `earns EGP ${fmt(exportTariff, 3)}/kWh` : "export tariff: not set"}
+                  avoids EGP {fmt(project.tariffValue, 3)}/kWh
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">
+                  Exported to Grid
+                </div>
+                <div className="text-lg font-mono font-semibold text-blue-600">
+                  {fmt(engineResult.exportedKwhY1, 0)} kWh
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {exportTariff > 0
+                    ? `earns EGP ${fmt(exportTariff, 3)}/kWh`
+                    : "export tariff: not set"}
                 </div>
               </div>
             </div>
@@ -308,16 +417,40 @@ export default function ProjectResultsPage({
             <div className="mt-3 h-3 rounded-full bg-muted overflow-hidden flex">
               <div
                 className="h-full bg-green-500 rounded-l-full transition-all"
-                style={{ width: `${(engineResult.selfConsumedKwhY1 / engineResult.annualProductionY1) * 100}%` }}
+                style={{
+                  width: `${(engineResult.selfConsumedKwhY1 / engineResult.annualProductionY1) * 100}%`,
+                }}
               />
               <div
                 className="h-full bg-blue-400 rounded-r-full"
-                style={{ width: `${(engineResult.exportedKwhY1 / engineResult.annualProductionY1) * 100}%` }}
+                style={{
+                  width: `${(engineResult.exportedKwhY1 / engineResult.annualProductionY1) * 100}%`,
+                }}
               />
             </div>
             <div className="flex gap-4 mt-1.5 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Self-consumed ({fmt((engineResult.selfConsumedKwhY1 / engineResult.annualProductionY1) * 100, 0)}%)</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> Exported ({fmt((engineResult.exportedKwhY1 / engineResult.annualProductionY1) * 100, 0)}%)</span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />{" "}
+                Self-consumed (
+                {fmt(
+                  (engineResult.selfConsumedKwhY1 /
+                    engineResult.annualProductionY1) *
+                    100,
+                  0
+                )}
+                %)
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />{" "}
+                Exported (
+                {fmt(
+                  (engineResult.exportedKwhY1 /
+                    engineResult.annualProductionY1) *
+                    100,
+                  0
+                )}
+                %)
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -330,7 +463,8 @@ export default function ProjectResultsPage({
             Cashflow Profile (EGP)
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Annual cashflow bars + cumulative cashflow line · Payback year marked
+            Annual cashflow bars + cumulative cashflow line · Payback year
+            marked
           </p>
         </CardHeader>
         <CardContent className="px-2 pb-5" data-testid="chart-cashflow">
@@ -395,6 +529,39 @@ export default function ProjectResultsPage({
         </CardContent>
       </Card>
 
+      {/* ── BOM Section (V3 — only if any equipment filled) ── */}
+      {hasBom && (
+        <Card>
+          <CardHeader className="pb-2 px-5 pt-5">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Package className="w-4 h-4" />
+              Equipment — Bill of Materials
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-5">
+            <table className="w-full text-sm" data-testid="table-bom">
+              <tbody className="divide-y divide-border">
+                {project.moduleModel && (
+                  <InfoRow label="PV Modules" value={project.moduleModel} />
+                )}
+                {project.inverterModel && (
+                  <InfoRow label="Inverter(s)" value={project.inverterModel} />
+                )}
+                {project.storageModel && (
+                  <InfoRow label="Storage System" value={project.storageModel} />
+                )}
+                {project.storageCapacityKwh != null && (
+                  <InfoRow
+                    label="Storage Capacity"
+                    value={`${fmt(project.storageCapacityKwh, 0)} kWh`}
+                  />
+                )}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Assumptions ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
@@ -410,21 +577,18 @@ export default function ProjectResultsPage({
             >
               <tbody className="divide-y divide-border">
                 {[
-                  ["System size", `${fmt(project.systemSizeKwp, 1)} kWp`],
-                  ["Total CAPEX", `EGP ${fmt(engineResult.totalCapex, 0)}`],
-                  ["CAPEX/kWp",   `EGP ${fmt(project.capexPerKwp, 0)}/kWp`],
-                  ["Annual O&M",  `EGP ${fmt((engineResult.totalCapex * project.oAndMPercent) / 100, 0)}/yr`],
-                  ["Region",      REGION_LABELS[project.region] ?? project.region],
-                  ["Specific yield", `${fmt(project.specificYield, 0)} kWh/kWp/yr`],
-                  ["Production (Y1)", `${fmt(engineResult.annualProductionY1, 0)} kWh/yr`],
-                  ["Avg production",  `${fmt(engineResult.annualProductionAvg, 0)} kWh/yr`],
+                  ["System size",       `${fmt(project.systemSizeKwp, 1)} kWp`],
+                  ["Total CAPEX",       `EGP ${fmt(engineResult.totalCapex, 0)}`],
+                  ["CAPEX/kWp",         `EGP ${fmt(project.capexPerKwp, 0)}/kWp`],
+                  ["Annual O&M",        `EGP ${fmt((engineResult.totalCapex * project.oAndMPercent) / 100, 0)}/yr`],
+                  ["Region",            REGION_LABELS[project.region] ?? project.region],
+                  ["Specific yield",    `${fmt(project.specificYield, 0)} kWh/kWp/yr`],
+                  ["Production (Y1)",   `${fmt(engineResult.annualProductionY1, 0)} kWh/yr`],
+                  ["Avg production",    `${fmt(engineResult.annualProductionAvg, 0)} kWh/yr`],
                   ["Panel degradation", "0.5%/yr"],
-                  ["CO₂ avoided", `${fmt(engineResult.co2SavedTonnes, 0)} tonnes`],
+                  ["CO₂ avoided",       `${fmt(engineResult.co2SavedTonnes, 0)} tonnes`],
                 ].map(([k, v]) => (
-                  <tr key={k}>
-                    <td className="py-1.5 text-muted-foreground text-xs">{k}</td>
-                    <td className="py-1.5 text-right font-mono text-xs font-medium">{v}</td>
-                  </tr>
+                  <InfoRow key={k} label={k} value={v} />
                 ))}
               </tbody>
             </table>
@@ -444,30 +608,66 @@ export default function ProjectResultsPage({
             >
               <tbody className="divide-y divide-border">
                 {[
-                  ["Grid tariff",     `EGP ${fmt(project.tariffValue, 3)}/kWh (${TARIFF_LABELS[project.tariffType] ?? project.tariffType})`],
-                  ["Export tariff",   exportTariff > 0 ? `EGP ${fmt(exportTariff, 3)}/kWh` : "Not set"],
-                  ["Self-consumed %", `${fmt(selfConsumptionRatio * 100, 0)}% on-site`],
-                  ["Escalation",      ESCALATION_LABELS[project.escalationScenario] ?? project.escalationScenario],
-                  ["Financing",       project.financingMode === "loan" ? "Bank loan (annuity)" : "Cash purchase"],
-                  ...(project.financingMode === "loan" && loanParams ? [
-                    ["Loan share",    `${fmt(loanParams.loanShare * 100, 0)}% of CAPEX`],
-                    ["Interest rate", `${fmt(loanParams.interestRate * 100, 1)}% p.a.`],
-                    ["Loan tenor",    `${loanParams.tenorYears} years`],
-                    ["Annual debt svc.", `EGP ${fmt(engineResult.annualDebtService, 0)}`],
-                  ] : []),
-                  ["Analysis period", `${project.analysisPeriod} years`],
-                  ["Discount rate",   `${((activeEpc?.discountRate ?? 0.11) * 100).toFixed(0)}%`],
+                  ["Grid tariff",      `EGP ${fmt(project.tariffValue, 3)}/kWh (${TARIFF_LABELS[project.tariffType] ?? project.tariffType})`],
+                  ["Export tariff",    exportTariff > 0 ? `EGP ${fmt(exportTariff, 3)}/kWh` : "Not set"],
+                  ["Self-consumed %",  `${fmt(selfConsumptionRatio * 100, 0)}% on-site`],
+                  ["Escalation",       ESCALATION_LABELS[project.escalationScenario] ?? project.escalationScenario],
+                  ["Financing",        project.financingMode === "loan" ? "Bank loan (annuity)" : "Cash purchase"],
+                  ...(project.financingMode === "loan" && loanParams
+                    ? [
+                        ["Loan share",       `${fmt(loanParams.loanShare * 100, 0)}% of CAPEX`],
+                        ["Interest rate",    `${fmt(loanParams.interestRate * 100, 1)}% p.a.`],
+                        ["Loan tenor",       `${loanParams.tenorYears} years`],
+                        ["Annual debt svc.", `EGP ${fmt(engineResult.annualDebtService, 0)}`],
+                      ]
+                    : []),
+                  ["Analysis period",  `${project.analysisPeriod} years`],
+                  ["Discount rate",    `${((activeEpc?.discountRate ?? 0.11) * 100).toFixed(0)}%`],
                 ].map(([k, v]) => (
-                  <tr key={k}>
-                    <td className="py-1.5 text-muted-foreground text-xs">{k}</td>
-                    <td className="py-1.5 text-right font-mono text-xs font-medium truncate max-w-[180px]">{v}</td>
-                  </tr>
+                  <InfoRow key={k} label={k} value={v} />
                 ))}
               </tbody>
             </table>
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Site Details (V3 — only if filled) ── */}
+      {hasSiteDetails && (
+        <Card>
+          <CardHeader className="pb-2 px-5 pt-5">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Project Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-5">
+            <table className="w-full text-sm" data-testid="table-project-details">
+              <tbody className="divide-y divide-border">
+                {project.projectName && (
+                  <InfoRow label="Project name" value={project.projectName} />
+                )}
+                {project.siteAddress && (
+                  <InfoRow label="Site address" value={project.siteAddress} />
+                )}
+                {project.gpsCoords && (
+                  <InfoRow label="GPS coordinates" value={project.gpsCoords} />
+                )}
+                {project.projectNote && (
+                  <tr>
+                    <td className="py-1.5 text-muted-foreground text-xs align-top w-44">
+                      EPC rationale
+                    </td>
+                    <td className="py-1.5 text-right text-xs leading-relaxed max-w-xs">
+                      {project.projectNote}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── PDF Download CTA ── */}
       <Card className="border-primary/20 bg-primary/5">
@@ -477,7 +677,8 @@ export default function ProjectResultsPage({
               Ready to share with your client?
             </div>
             <div className="text-xs text-muted-foreground mt-0.5">
-              Download the branded 4-page PDF — cover, cashflow chart, full cashflow table, and assumptions.
+              Download the branded 6-page PDF proposal — cover, energy flow,
+              financial results, cashflow table, and assumptions.
             </div>
           </div>
           <Button
