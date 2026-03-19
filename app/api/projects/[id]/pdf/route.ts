@@ -14,6 +14,12 @@ export const dynamic = "force-dynamic";
 const FONT_REGULAR = path.join(process.cwd(), "public", "fonts", "Amiri-Regular.ttf");
 const FONT_BOLD    = path.join(process.cwd(), "public", "fonts", "Amiri-Bold.ttf");
 
+// ── Arabic helper — strip harakat (diacritics) to avoid fontkit GPOS null-anchor crash ──
+function stripArabicDiacritics(text: string): string {
+  // Unicode ranges: U+0610–U+061A (extended Arabic marks) and U+064B–U+065F (harakat)
+  return text.replace(/[\u0610-\u061A\u064B-\u065F]/g, "");
+}
+
 // ── Colour helpers ─────────────────────────────────────────────────────────────
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace("#", "");
@@ -190,10 +196,10 @@ export async function GET(
       .text(noteEN, ML + 10, ratY + 8, { width: CW - 20 });
 
     // Arabic rationale (rendered with Amiri if available)
-    const arText = `يُقدِّم هذا المقترح الجدوى المالية والبيئية لتركيب منظومة طاقة شمسية بقدرة ${fmt(project.systemSizeKwp, 1)} ك.و.ذ في ${project.siteName}، ${project.city}، مع توفير ملحوظ في تكاليف الكهرباء وعائد استثمار مجزٍ على مدى ${project.analysisPeriod} عامًا.`;
+    const arText = stripArabicDiacritics(`يقدم هذا المقترح الجدوى المالية والبيئية لتركيب منظومة طاقة شمسية بقدرة ${fmt(project.systemSizeKwp, 1)} ك.و.ذ في ${project.siteName}، ${project.city}، مع توفير ملحوظ في تكاليف الكهرباء وعائد استثمار مجز على مدى ${project.analysisPeriod} عاما.`);
     if (arabicAvailable) {
       doc.font("Amiri").fontSize(9).fillColor("#555555")
-        .text(arText, ML + 10, ratY + 46, { width: CW - 20, features: ["rtla"] });
+        .text(arText, ML + 10, ratY + 46, { width: CW - 20 });
     } else {
       doc.font("Helvetica").fontSize(8).fillColor("#888888")
         .text("[Arabic version available when Amiri font is loaded]", ML + 10, ratY + 46, { width: CW - 20 });
@@ -374,10 +380,10 @@ export async function GET(
 
     // Arabic savings summary
     if (arabicAvailable) {
-      const arSavings = `يُنتج هذا النظام ${fmt(prodY1,0)} ك.و.س سنويًا، يُستهلك منها ${fmt(selfConsumed,0)} ك.و.س ذاتيًا مما يُوفِّر EGP ${fmt(gridSavings,0)} في السنة الأولى${exportRevenue > 0 ? `، بالإضافة إلى EGP ${fmt(exportRevenue,0)} من عائد التغذية العكسية` : ""}. ويُتوقَّع أن يُحقِّق المشروع العائد على الاستثمار خلال ${result.simplePayback !== null ? fmt(result.simplePayback,1) : "N/A"} سنوات.`;
-      doc.rect(ML, y3 - 2, CW, 36).fill(brandL);  // brandL is now hex string — OK
+      const arSavings = stripArabicDiacritics(`ينتج هذا النظام ${fmt(prodY1,0)} ك.و.س سنويا، يستهلك منها ${fmt(selfConsumed,0)} ك.و.س ذاتيا مما يوفر EGP ${fmt(gridSavings,0)} في السنة الاولى${exportRevenue > 0 ? `، بالاضافة الى EGP ${fmt(exportRevenue,0)} من عائد التغذية العكسية` : ""}. ويتوقع ان يحقق المشروع العائد على الاستثمار خلال ${result.simplePayback !== null ? fmt(result.simplePayback,1) : "N/A"} سنوات.`);
+      doc.rect(ML, y3 - 2, CW, 36).fill(brandL);
       doc.font("Amiri").fontSize(10).fillColor("#1a5c60")
-        .text(arSavings, ML + 10, y3 + 4, { width: CW - 20, features: ["rtla"] });
+        .text(arSavings, ML + 10, y3 + 4, { width: CW - 20 });
       y3 += 42;
     }
 
