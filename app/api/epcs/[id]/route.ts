@@ -5,6 +5,7 @@ import { z } from "zod";
 const updateEpcSchema = z.object({
   name:         z.string().min(1).optional(),
   email:        z.string().email().optional(),
+  phone:        z.string().nullable().optional(),
   logoUrl:      z.string().nullable().optional(),
   brandColor:   z.string().optional(),
   discountRate: z.number().min(0.01).max(0.5).optional(),
@@ -25,7 +26,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const body = await req.json();
+  const body   = await req.json();
   const parsed = updateEpcSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ errors: parsed.error.flatten() }, { status: 400 });
@@ -33,7 +34,7 @@ export async function PATCH(
   try {
     const epc = await prisma.epc.update({
       where: { id: Number(id) },
-      data: parsed.data,
+      data:  parsed.data,
     });
     return NextResponse.json(epc);
   } catch {

@@ -3,7 +3,8 @@ import { use } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
-  LineChart,
+  ComposedChart,
+  Bar,
   Line,
   XAxis,
   YAxis,
@@ -25,7 +26,7 @@ import {
   ESCALATION_PRESETS,
 } from "@/lib/constants";
 import type { ProjectData, LoanParams } from "@/lib/types";
-import { Download, ArrowLeft, TrendingUp, Clock, DollarSign, BarChart2 } from "lucide-react";
+import { Download, ArrowLeft, TrendingUp, Clock, DollarSign, BarChart2, Leaf, Zap } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt(n: number, decimals = 0) {
@@ -153,16 +154,19 @@ export default function ProjectResultsPage({
       : undefined;
 
   const engineResult = runFinancialEngine({
-    systemSizeKwp: project.systemSizeKwp,
-    region: project.region,
-    capexPerKwp: project.capexPerKwp,
-    oAndMPercent: project.oAndMPercent,
-    tariffValue: project.tariffValue,
-    escalationRate: ESCALATION_PRESETS[project.escalationScenario] ?? 0,
-    financingMode: (project.financingMode as "cash" | "loan") ?? "cash",
+    systemSizeKwp:        project.systemSizeKwp,
+    region:               project.region,
+    capexPerKwp:          project.capexPerKwp,
+    oAndMPercent:         project.oAndMPercent,
+    tariffValue:          project.tariffValue,
+    escalationRate:       ESCALATION_PRESETS[project.escalationScenario] ?? 0,
+    financingMode:        (project.financingMode as "cash" | "loan") ?? "cash",
     loanParams,
-    analysisPeriod: project.analysisPeriod,
-    discountRate: activeEpc?.discountRate ?? 0.11,
+    analysisPeriod:       project.analysisPeriod,
+    discountRate:         activeEpc?.discountRate ?? 0.11,
+    consumptionKwh:       (project as any).consumptionKwh ?? 0,
+    selfConsumptionRatio: (project as any).selfConsumptionRatio ?? 0.8,
+    exportTariff:         (project as any).exportTariff ?? 0,
   });
 
   const chartData = engineResult.annualCashflows.map((cf, i) => ({
@@ -188,6 +192,9 @@ export default function ProjectResultsPage({
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const selfConsumptionRatio = (project as any).selfConsumptionRatio ?? 0.8;
+  const exportTariff         = (project as any).exportTariff ?? 0;
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -224,7 +231,7 @@ export default function ProjectResultsPage({
       </div>
 
       {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <KpiCard
           label="Simple Payback"
           value={
@@ -233,13 +240,13 @@ export default function ProjectResultsPage({
               : ">25"
           }
           unit="yrs"
-          sub="from first year of operation"
+          sub="from first year"
           icon={Clock}
         />
         <KpiCard
-          label="25-yr NPV"
+          label="NPV"
           value={`EGP ${fmt(engineResult.npv / 1e6, 2)}M`}
-          sub={`at ${((activeEpc?.discountRate ?? 0.11) * 100).toFixed(0)}% discount rate`}
+          sub={`at ${((activeEpc?.discountRate ?? 0.11) * 100).toFixed(0)}% discount`}
           icon={DollarSign}
         />
         <KpiCard
@@ -253,12 +260,68 @@ export default function ProjectResultsPage({
           icon={TrendingUp}
         />
         <KpiCard
-          label="Annual Production"
-          value={`${fmt(engineResult.annualProduction / 1000, 1)} GWh`}
-          sub={`${fmt(engineResult.annualProduction, 0)} kWh/yr`}
+          label="Production Y1"
+          value={`${fmt(engineResult.annualProductionY1 / 1000, 1)} GWh`}
+          sub={`${fmt(engineResult.annualProductionY1, 0)} kWh/yr`}
           icon={BarChart2}
         />
+        <KpiCard
+          label="Self-Consumed Y1"
+          value={`${fmt(engineResult.selfConsumedKwhY1 / 1000, 1)} GWh`}
+          sub={`${fmt(selfConsumptionRatio * 100, 0)}% on-site ratio`}
+          icon={Zap}
+        />
+        <KpiCard
+          label="CO₂ Avoided"
+          value={`${fmt(engineResult.co2SavedTonnes, 0)}t`}
+          sub={`over ${project.analysisPeriod} years`}
+          icon={Leaf}
+        />
       </div>
+
+      {/* ── Self-consumption breakdown ── */}
+      {((project as any).consumptionKwh > 0 || selfConsumptionRatio < 1) && (
+        <Card>
+          <CardHeader className="pb-2 px-5 pt-5">
+            <CardTitle className="text-sm font-semibold">Energy Split (Year 1)</CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-5">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Total Production</div>
+                <div className="text-lg font-mono font-semibold text-primary">{fmt(engineResult.annualProductionY1, 0)} kWh</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Self-Consumed</div>
+                <div className="text-lg font-mono font-semibold text-green-600">{fmt(engineResult.selfConsumedKwhY1, 0)} kWh</div>
+                <div className="text-xs text-muted-foreground">avoids EGP {fmt(project.tariffValue, 3)}/kWh</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Exported</div>
+                <div className="text-lg font-mono font-semibold text-blue-600">{fmt(engineResult.exportedKwhY1, 0)} kWh</div>
+                <div className="text-xs text-muted-foreground">
+                  {exportTariff > 0 ? `earns EGP ${fmt(exportTariff, 3)}/kWh` : "export tariff: not set"}
+                </div>
+              </div>
+            </div>
+            {/* Visual bar */}
+            <div className="mt-3 h-3 rounded-full bg-muted overflow-hidden flex">
+              <div
+                className="h-full bg-green-500 rounded-l-full transition-all"
+                style={{ width: `${(engineResult.selfConsumedKwhY1 / engineResult.annualProductionY1) * 100}%` }}
+              />
+              <div
+                className="h-full bg-blue-400 rounded-r-full"
+                style={{ width: `${(engineResult.exportedKwhY1 / engineResult.annualProductionY1) * 100}%` }}
+              />
+            </div>
+            <div className="flex gap-4 mt-1.5 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Self-consumed ({fmt((engineResult.selfConsumedKwhY1 / engineResult.annualProductionY1) * 100, 0)}%)</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> Exported ({fmt((engineResult.exportedKwhY1 / engineResult.annualProductionY1) * 100, 0)}%)</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Cashflow Chart ── */}
       <Card>
@@ -267,12 +330,12 @@ export default function ProjectResultsPage({
             Cashflow Profile (EGP)
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Annual and cumulative project cashflows over the analysis period
+            Annual cashflow bars + cumulative cashflow line · Payback year marked
           </p>
         </CardHeader>
         <CardContent className="px-2 pb-5" data-testid="chart-cashflow">
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart
+            <ComposedChart
               data={chartData}
               margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
             >
@@ -307,19 +370,17 @@ export default function ProjectResultsPage({
                   stroke={brandColor}
                   strokeDasharray="4 4"
                   label={{
-                    value: `Payback yr ${Math.ceil(engineResult.simplePayback)}`,
+                    value: `Payback yr ${engineResult.simplePayback.toFixed(1)}`,
                     fill: brandColor,
                     fontSize: 10,
                   }}
                 />
               )}
-              <Line
-                type="monotone"
+              <Bar
                 dataKey="Annual CF"
-                stroke={brandColor}
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4 }}
+                fill={brandColor}
+                opacity={0.75}
+                radius={[2, 2, 0, 0]}
               />
               <Line
                 type="monotone"
@@ -329,7 +390,7 @@ export default function ProjectResultsPage({
                 dot={false}
                 activeDot={{ r: 4 }}
               />
-            </LineChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
@@ -350,34 +411,19 @@ export default function ProjectResultsPage({
               <tbody className="divide-y divide-border">
                 {[
                   ["System size", `${fmt(project.systemSizeKwp, 1)} kWp`],
-                  [
-                    "Total CAPEX",
-                    `EGP ${fmt(engineResult.totalCapex, 0)}`,
-                  ],
-                  [
-                    "CAPEX/kWp",
-                    `EGP ${fmt(project.capexPerKwp, 0)}/kWp`,
-                  ],
-                  [
-                    "Annual O&M",
-                    `EGP ${fmt((engineResult.totalCapex * project.oAndMPercent) / 100, 0)}/yr`,
-                  ],
-                  [
-                    "Region",
-                    REGION_LABELS[project.region] ?? project.region,
-                  ],
-                  [
-                    "Specific yield",
-                    `${fmt(project.specificYield, 0)} kWh/kWp/yr`,
-                  ],
+                  ["Total CAPEX", `EGP ${fmt(engineResult.totalCapex, 0)}`],
+                  ["CAPEX/kWp",   `EGP ${fmt(project.capexPerKwp, 0)}/kWp`],
+                  ["Annual O&M",  `EGP ${fmt((engineResult.totalCapex * project.oAndMPercent) / 100, 0)}/yr`],
+                  ["Region",      REGION_LABELS[project.region] ?? project.region],
+                  ["Specific yield", `${fmt(project.specificYield, 0)} kWh/kWp/yr`],
+                  ["Production (Y1)", `${fmt(engineResult.annualProductionY1, 0)} kWh/yr`],
+                  ["Avg production",  `${fmt(engineResult.annualProductionAvg, 0)} kWh/yr`],
+                  ["Panel degradation", "0.5%/yr"],
+                  ["CO₂ avoided", `${fmt(engineResult.co2SavedTonnes, 0)} tonnes`],
                 ].map(([k, v]) => (
                   <tr key={k}>
-                    <td className="py-1.5 text-muted-foreground text-xs">
-                      {k}
-                    </td>
-                    <td className="py-1.5 text-right font-mono text-xs font-medium">
-                      {v}
-                    </td>
+                    <td className="py-1.5 text-muted-foreground text-xs">{k}</td>
+                    <td className="py-1.5 text-right font-mono text-xs font-medium">{v}</td>
                   </tr>
                 ))}
               </tbody>
@@ -398,58 +444,23 @@ export default function ProjectResultsPage({
             >
               <tbody className="divide-y divide-border">
                 {[
-                  [
-                    "Tariff type",
-                    TARIFF_LABELS[project.tariffType] ?? project.tariffType,
-                  ],
-                  [
-                    "Starting tariff",
-                    `EGP ${fmt(project.tariffValue, 3)}/kWh`,
-                  ],
-                  [
-                    "Escalation",
-                    ESCALATION_LABELS[project.escalationScenario] ??
-                      project.escalationScenario,
-                  ],
-                  [
-                    "Financing",
-                    project.financingMode === "loan"
-                      ? "Bank loan (annuity)"
-                      : "Cash purchase",
-                  ],
-                  ...(project.financingMode === "loan" && loanParams
-                    ? [
-                        [
-                          "Loan share",
-                          `${fmt(loanParams.loanShare * 100, 0)}% of CAPEX`,
-                        ],
-                        [
-                          "Interest rate",
-                          `${fmt(loanParams.interestRate * 100, 1)}% p.a.`,
-                        ],
-                        [
-                          "Loan tenor",
-                          `${loanParams.tenorYears} years`,
-                        ],
-                        [
-                          "Annual debt svc.",
-                          `EGP ${fmt(engineResult.annualDebtService, 0)}`,
-                        ],
-                      ]
-                    : []),
+                  ["Grid tariff",     `EGP ${fmt(project.tariffValue, 3)}/kWh (${TARIFF_LABELS[project.tariffType] ?? project.tariffType})`],
+                  ["Export tariff",   exportTariff > 0 ? `EGP ${fmt(exportTariff, 3)}/kWh` : "Not set"],
+                  ["Self-consumed %", `${fmt(selfConsumptionRatio * 100, 0)}% on-site`],
+                  ["Escalation",      ESCALATION_LABELS[project.escalationScenario] ?? project.escalationScenario],
+                  ["Financing",       project.financingMode === "loan" ? "Bank loan (annuity)" : "Cash purchase"],
+                  ...(project.financingMode === "loan" && loanParams ? [
+                    ["Loan share",    `${fmt(loanParams.loanShare * 100, 0)}% of CAPEX`],
+                    ["Interest rate", `${fmt(loanParams.interestRate * 100, 1)}% p.a.`],
+                    ["Loan tenor",    `${loanParams.tenorYears} years`],
+                    ["Annual debt svc.", `EGP ${fmt(engineResult.annualDebtService, 0)}`],
+                  ] : []),
                   ["Analysis period", `${project.analysisPeriod} years`],
-                  [
-                    "Discount rate",
-                    `${((activeEpc?.discountRate ?? 0.11) * 100).toFixed(0)}%`,
-                  ],
+                  ["Discount rate",   `${((activeEpc?.discountRate ?? 0.11) * 100).toFixed(0)}%`],
                 ].map(([k, v]) => (
                   <tr key={k}>
-                    <td className="py-1.5 text-muted-foreground text-xs">
-                      {k}
-                    </td>
-                    <td className="py-1.5 text-right font-mono text-xs font-medium truncate max-w-[180px]">
-                      {v}
-                    </td>
+                    <td className="py-1.5 text-muted-foreground text-xs">{k}</td>
+                    <td className="py-1.5 text-right font-mono text-xs font-medium truncate max-w-[180px]">{v}</td>
                   </tr>
                 ))}
               </tbody>
@@ -466,8 +477,7 @@ export default function ProjectResultsPage({
               Ready to share with your client?
             </div>
             <div className="text-xs text-muted-foreground mt-0.5">
-              Download the branded PDF proposal — 3 pages with executive
-              summary, metrics, and assumptions.
+              Download the branded 4-page PDF — cover, cashflow chart, full cashflow table, and assumptions.
             </div>
           </div>
           <Button

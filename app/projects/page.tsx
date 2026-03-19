@@ -1,13 +1,14 @@
 "use client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useEpc } from "@/components/Providers";
+import { useToast } from "@/hooks/use-toast";
 import type { ProjectData } from "@/lib/types";
-import { Plus, FileText, ExternalLink } from "lucide-react";
+import { Plus, FileText, ExternalLink, Trash2 } from "lucide-react";
 import { REGION_LABELS } from "@/lib/constants";
 
 function fmt(n: number | null | undefined, dec = 0) {
@@ -26,19 +27,38 @@ function formatDate(iso: string | null | undefined) {
 
 export default function ProjectsPage() {
   const { activeEpcId, activeEpc } = useEpc();
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const brandColor = activeEpc?.brandColor ?? "#0d6e74";
 
   const { data: projects, isLoading } = useQuery<ProjectData[]>({
     queryKey: ["/api/projects", activeEpcId],
     queryFn: async () => {
-      const url = activeEpcId
-        ? `/api/projects?epcId=${activeEpcId}`
-        : "/api/projects";
+      const url = activeEpcId ? `/api/projects?epcId=${activeEpcId}` : "/api/projects";
       const res = await fetch(url);
       return res.json();
     },
     enabled: true,
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/projects", activeEpcId] });
+      toast({ title: "Proposal deleted" });
+    },
+    onError: () => {
+      toast({ title: "Delete failed", variant: "destructive" });
+    },
+  });
+
+  const handleDelete = (p: ProjectData) => {
+    if (!confirm(`Delete proposal for "${p.clientName}"? This cannot be undone.`)) return;
+    deleteMutation.mutate(p.id);
+  };
 
   return (
     <div className="space-y-5">
@@ -162,18 +182,30 @@ export default function ProjectsPage() {
                       </div>
                     </div>
 
-                    {/* Action */}
-                    <Link href={`/projects/${p.id}`}>
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Link href={`/projects/${p.id}`}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          data-testid={`button-open-${p.id}`}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          Open
+                        </Button>
+                      </Link>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="gap-1.5 shrink-0"
-                        data-testid={`button-open-${p.id}`}
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive px-2"
+                        onClick={() => handleDelete(p)}
+                        disabled={deleteMutation.isPending}
+                        data-testid={`button-delete-${p.id}`}
                       >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        Open
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
-                    </Link>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

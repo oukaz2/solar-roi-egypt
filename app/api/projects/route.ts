@@ -27,6 +27,10 @@ export async function POST(req: NextRequest) {
       ? (DEFAULT_TARIFFS[b.tariffType] ?? 2.0)
       : Number(b.tariffValue);
 
+    const exportTariff        = Number(b.exportTariff ?? 0);
+    const consumptionKwh      = Number(b.consumptionKwh ?? 0);
+    const selfConsumptionRatio = Number(b.selfConsumptionRatio ?? 0.8);
+
     const loanParams: LoanParams | undefined =
       b.financingMode === "loan" && b.financingParams
         ? (typeof b.financingParams === "string"
@@ -35,39 +39,45 @@ export async function POST(req: NextRequest) {
         : undefined;
 
     const result = runFinancialEngine({
-      systemSizeKwp:  Number(b.systemSizeKwp),
-      region:         b.region,
-      capexPerKwp:    Number(b.capexPerKwp),
-      oAndMPercent:   Number(b.oAndMPercent),
+      systemSizeKwp:       Number(b.systemSizeKwp),
+      region:              b.region,
+      capexPerKwp:         Number(b.capexPerKwp),
+      oAndMPercent:        Number(b.oAndMPercent),
       tariffValue,
-      escalationRate: ESCALATION_PRESETS[b.escalationScenario] ?? 0,
-      financingMode:  b.financingMode ?? "cash",
+      escalationRate:      ESCALATION_PRESETS[b.escalationScenario] ?? 0,
+      financingMode:       b.financingMode ?? "cash",
       loanParams,
-      analysisPeriod: Number(b.analysisPeriod) || 25,
+      analysisPeriod:      Number(b.analysisPeriod) || 25,
       discountRate,
+      consumptionKwh,
+      selfConsumptionRatio,
+      exportTariff,
     });
 
     const project = await prisma.project.create({
       data: {
         epcId,
-        clientName:         b.clientName,
-        siteName:           b.siteName,
-        city:               b.city,
-        systemSizeKwp:      Number(b.systemSizeKwp),
-        capexPerKwp:        Number(b.capexPerKwp),
-        oAndMPercent:       Number(b.oAndMPercent),
-        region:             b.region,
-        specificYield:      REGION_YIELDS[b.region] ?? 1650,
-        tariffType:         b.tariffType,
+        clientName:           b.clientName,
+        siteName:             b.siteName,
+        city:                 b.city,
+        systemSizeKwp:        Number(b.systemSizeKwp),
+        capexPerKwp:          Number(b.capexPerKwp),
+        oAndMPercent:         Number(b.oAndMPercent),
+        region:               b.region,
+        specificYield:        REGION_YIELDS[b.region] ?? 1650,
+        tariffType:           b.tariffType,
         tariffValue,
-        escalationScenario: b.escalationScenario,
-        financingMode:      b.financingMode ?? "cash",
-        financingParams:    loanParams ? JSON.stringify(loanParams) : null,
-        analysisPeriod:     Number(b.analysisPeriod) || 25,
-        simplePayback:      result.simplePayback,
-        npv:                result.npv,
-        irr:                result.irr,
-        annualProduction:   result.annualProduction,
+        exportTariff,
+        escalationScenario:   b.escalationScenario,
+        consumptionKwh,
+        selfConsumptionRatio,
+        financingMode:        b.financingMode ?? "cash",
+        financingParams:      loanParams ? JSON.stringify(loanParams) : null,
+        analysisPeriod:       Number(b.analysisPeriod) || 25,
+        simplePayback:        result.simplePayback,
+        npv:                  result.npv,
+        irr:                  result.irr,
+        annualProduction:     result.annualProductionY1,
       },
     });
 

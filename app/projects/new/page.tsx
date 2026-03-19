@@ -18,7 +18,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ChevronRight } from "lucide-react";
+import { Loader2, ChevronRight, Info } from "lucide-react";
 import {
   DEFAULT_CAPEX_PER_KWP,
   DEFAULT_OM_PERCENT,
@@ -52,7 +52,21 @@ const schema = z
       .number({ invalid_type_error: "Enter a number" })
       .positive()
       .optional(),
+    exportTariff: z
+      .number({ invalid_type_error: "Enter a number" })
+      .min(0)
+      .default(0.0),
     escalationScenario: z.enum(["0", "7.5", "17.5"]),
+    // Self-consumption
+    consumptionKwh: z
+      .number({ invalid_type_error: "Enter a number" })
+      .min(0)
+      .default(0),
+    selfConsumptionRatio: z
+      .number({ invalid_type_error: "Enter a number" })
+      .min(0)
+      .max(1)
+      .default(0.8),
     financingMode: z.enum(["cash", "loan"]),
     loanShare: z.number().min(10).max(100).optional(),
     interestRate: z.number().min(1).max(50).optional(),
@@ -153,7 +167,10 @@ export default function NewProjectPage() {
       oAndMPercent: DEFAULT_OM_PERCENT,
       region: "cairo_delta",
       tariffType: "industrial_mv",
+      exportTariff: 0.0,
       escalationScenario: "7.5",
+      consumptionKwh: 0,
+      selfConsumptionRatio: 0.8,
       financingMode: "cash",
       loanShare: DEFAULT_LOAN_SHARE * 100,
       interestRate: DEFAULT_INTEREST_RATE * 100,
@@ -175,11 +192,16 @@ export default function NewProjectPage() {
   const region = watch("region");
   const systemKwp = watch("systemSizeKwp") ?? 0;
   const capex = watch("capexPerKwp") ?? 0;
+  const consumptionKwh = watch("consumptionKwh") ?? 0;
+  const selfConsumptionRatio = watch("selfConsumptionRatio") ?? 0.8;
   const totalCapex = systemKwp * capex;
 
   const yieldForRegion =
     region === "north" ? 1550 : region === "upper_egypt" ? 1800 : 1650;
   const estProduction = (systemKwp || 0) * yieldForRegion;
+  const eligibleProd = consumptionKwh > 0 ? Math.min(estProduction, consumptionKwh) : estProduction;
+  const estSelfConsumed = eligibleProd * selfConsumptionRatio;
+  const estExported = estProduction - estSelfConsumed;
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -200,7 +222,10 @@ export default function NewProjectPage() {
         specificYield: REGION_YIELDS[data.region] ?? 1650,
         tariffType: data.tariffType,
         tariffValue,
+        exportTariff: data.exportTariff ?? 0.0,
         escalationScenario: data.escalationScenario,
+        consumptionKwh: data.consumptionKwh ?? 0,
+        selfConsumptionRatio: data.selfConsumptionRatio ?? 0.8,
         financingMode: data.financingMode,
         analysisPeriod: data.analysisPeriod,
         discountRate: activeEpc?.discountRate ?? 0.11,
@@ -384,7 +409,7 @@ export default function NewProjectPage() {
               </Field>
               <div className="bg-primary/5 rounded-lg p-3 border border-primary/10 flex flex-col justify-center">
                 <div className="text-xs text-muted-foreground">
-                  Est. annual production
+                  Est. annual production (Year 1)
                 </div>
                 <div className="text-lg font-mono font-semibold text-primary">
                   {estProduction.toLocaleString()} kWh/yr
@@ -399,7 +424,7 @@ export default function NewProjectPage() {
           <CardContent className="pt-5">
             <SectionTitle icon="📊" title="Tariff & Escalation" />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Field label="Tariff Type" error={errors.tariffType?.message}>
+              <Field label="Grid Purchase Tariff" error={errors.tariffType?.message}>
                 <Controller
                   control={control}
                   name="tariffType"
@@ -427,7 +452,7 @@ export default function NewProjectPage() {
 
               {tariffType === "custom" && (
                 <Field
-                  label="Custom Tariff (EGP/kWh)"
+                  label="Custom Grid Tariff (EGP/kWh)"
                   error={errors.customTariff?.message}
                 >
                   <Input
@@ -439,6 +464,21 @@ export default function NewProjectPage() {
                   />
                 </Field>
               )}
+
+              <Field
+                label="Export Tariff (EGP/kWh)"
+                error={errors.exportTariff?.message}
+                hint="Revenue for surplus sent to grid (0 if net-metering not available)"
+              >
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 0.80"
+                  data-testid="input-export-tariff"
+                  {...register("exportTariff", { valueAsNumber: true })}
+                />
+              </Field>
 
               <Field
                 label="Tariff Escalation"
@@ -471,6 +511,61 @@ export default function NewProjectPage() {
                 />
               </Field>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Self-Consumption ── */}
+        <Card>
+          <CardContent className="pt-5">
+            <SectionTitle icon="🏭" title="Self-Consumption" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field
+                label="Annual Site Consumption (kWh)"
+                error={errors.consumptionKwh?.message}
+                hint="Leave 0 if unknown — engine assumes unlimited consumption"
+              >
+                <Input
+                  type="number"
+                  step="1000"
+                  min="0"
+                  placeholder="e.g. 800000"
+                  data-testid="input-consumption-kwh"
+                  {...register("consumptionKwh", { valueAsNumber: true })}
+                />
+              </Field>
+              <Field
+                label="Self-Consumption Ratio"
+                error={errors.selfConsumptionRatio?.message}
+                hint="Fraction of eligible production consumed on-site (0–1)"
+              >
+                <Input
+                  type="number"
+                  step="0.05"
+                  min="0"
+                  max="1"
+                  placeholder="e.g. 0.80"
+                  data-testid="input-self-consumption-ratio"
+                  {...register("selfConsumptionRatio", { valueAsNumber: true })}
+                />
+              </Field>
+            </div>
+            {/* Live preview */}
+            {estProduction > 0 && (
+              <div className="mt-3 bg-primary/5 border border-primary/10 rounded-lg p-3 grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <div className="text-xs text-muted-foreground">Production (Y1)</div>
+                  <div className="text-sm font-mono font-semibold text-primary">{estProduction.toLocaleString()} kWh</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Self-Consumed</div>
+                  <div className="text-sm font-mono font-semibold text-green-600">{Math.round(estSelfConsumed).toLocaleString()} kWh</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Exported</div>
+                  <div className="text-sm font-mono font-semibold text-blue-600">{Math.round(estExported).toLocaleString()} kWh</div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -543,7 +638,7 @@ export default function NewProjectPage() {
             ) : (
               <div className="bg-muted/40 rounded-lg p-3 text-sm text-muted-foreground">
                 Cash purchase — full CAPEX paid upfront. Cashflow = avoided grid
-                cost – O&amp;M.
+                cost + export revenue – O&amp;M.
               </div>
             )}
           </CardContent>
@@ -573,7 +668,7 @@ export default function NewProjectPage() {
                   <strong>
                     {((activeEpc?.discountRate ?? 0.11) * 100).toFixed(0)}%
                   </strong>{" "}
-                  (set in EPC profile)
+                  (set in EPC profile) · Panel degradation: 0.5%/yr applied automatically
                 </p>
               </div>
             </div>

@@ -19,6 +19,7 @@ model Epc {
   id           Int       @id @default(autoincrement())
   name         String
   email        String
+  phone        String?
   logoUrl      String?
   brandColor   String    @default("#0d6e74")
   discountRate Float     @default(0.11)
@@ -45,10 +46,15 @@ model Project {
   region             String
   specificYield      Float
 
-  // Tariffs
+  // Tariffs (V2: grid avoidance tariff + export tariff)
   tariffType         String
-  tariffValue        Float
+  tariffValue        Float          // grid purchase tariff (avoided cost)
+  exportTariff       Float          @default(0.0)  // EGP/kWh for surplus export
   escalationScenario String
+
+  // Self-consumption (V2)
+  consumptionKwh     Float?         // annual site consumption in kWh (optional)
+  selfConsumptionRatio Float        @default(0.8)  // fraction of min(prod,cons) used on-site
 
   // Financing
   financingMode      String   @default("cash")

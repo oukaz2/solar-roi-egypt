@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
 
+// Logo is stored as a base64 data URL directly in the DB.
+// This avoids any filesystem writes — critical for Vercel serverless
+// where the filesystem is ephemeral and files disappear between invocations.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -13,17 +14,13 @@ export async function POST(
     const file = formData.get("logo") as File | null;
     if (!file) return NextResponse.json({ message: "No file" }, { status: 400 });
 
-    const bytes = await file.arrayBuffer();
+    const bytes  = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+    const mime   = file.type || "image/png";
 
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    await mkdir(uploadsDir, { recursive: true });
+    // Store as inline data URL — no disk I/O, survives Vercel cold starts
+    const logoUrl = `data:${mime};base64,${buffer.toString("base64")}`;
 
-    const ext  = file.name.split(".").pop() || "png";
-    const name = `epc-${id}-${Date.now()}.${ext}`;
-    await writeFile(path.join(uploadsDir, name), buffer);
-
-    const logoUrl = `/uploads/${name}`;
     const epc = await prisma.epc.update({
       where: { id: Number(id) },
       data: { logoUrl },
