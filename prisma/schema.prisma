@@ -1,14 +1,19 @@
 // Prisma schema — Solar ROI Egypt
-// Default: SQLite for local dev.
-// For production: change provider to "postgresql" and update DATABASE_URL.
+// Database: PostgreSQL (Neon, Supabase, or any Postgres provider)
+// Local dev: set DATABASE_URL in .env to your Postgres connection string
+// Vercel: set DATABASE_URL in project environment variables
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Neon (and some other providers) require a non-pooling URL for migrations.
+  // If you use Neon, also set DIRECT_URL in your env:
+  //   directUrl = env("DIRECT_URL")
+  // and uncomment the line above. For a basic Neon setup the pooled URL works fine.
 }
 
 model Epc {
