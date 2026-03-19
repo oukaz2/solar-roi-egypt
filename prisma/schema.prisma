@@ -1,0 +1,63 @@
+// Prisma schema — Solar ROI Egypt
+// Default: SQLite for local dev.
+// For production: change provider to "postgresql" and update DATABASE_URL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Epc {
+  id           Int       @id @default(autoincrement())
+  name         String
+  email        String
+  logoUrl      String?
+  brandColor   String    @default("#0d6e74")
+  discountRate Float     @default(0.11)
+  createdAt    DateTime  @default(now())
+  projects     Project[]
+}
+
+model Project {
+  id                 Int      @id @default(autoincrement())
+  epcId              Int
+  epc                Epc      @relation(fields: [epcId], references: [id])
+
+  // Client info
+  clientName         String
+  siteName           String
+  city               String
+
+  // System design
+  systemSizeKwp      Float
+  capexPerKwp        Float
+  oAndMPercent       Float    @default(1.0)
+
+  // Production
+  region             String
+  specificYield      Float
+
+  // Tariffs
+  tariffType         String
+  tariffValue        Float
+  escalationScenario String
+
+  // Financing
+  financingMode      String   @default("cash")
+  financingParams    String?  // JSON string: { loanShare, interestRate, tenorYears }
+
+  // Analysis
+  analysisPeriod     Int      @default(25)
+
+  // Computed results (stored for fast retrieval)
+  simplePayback      Float?
+  npv                Float?
+  irr                Float?
+  annualProduction   Float?
+
+  createdAt          DateTime @default(now())
+}

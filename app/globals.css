@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background:         210 20% 98%;
+    --foreground:         215 25% 12%;
+    --card:               0 0% 100%;
+    --card-foreground:    215 25% 12%;
+    --popover:            0 0% 100%;
+    --popover-foreground: 215 25% 12%;
+    --primary:            184 96% 22%;
+    --primary-foreground: 0 0% 100%;
+    --secondary:          210 14% 94%;
+    --secondary-foreground: 215 25% 20%;
+    --muted:              210 14% 94%;
+    --muted-foreground:   215 10% 46%;
+    --accent:             38 95% 48%;
+    --accent-foreground:  215 25% 10%;
+    --destructive:        0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border:             210 14% 88%;
+    --input:              210 14% 88%;
+    --ring:               184 96% 22%;
+    --radius:             0.5rem;
+    --font-inter:         'Inter', system-ui, sans-serif;
+    --font-mono:          'IBM Plex Mono', monospace;
+  }
+
+  .dark {
+    --background:         215 28% 8%;
+    --foreground:         210 14% 88%;
+    --card:               215 25% 10%;
+    --card-foreground:    210 14% 88%;
+    --popover:            215 25% 10%;
+    --popover-foreground: 210 14% 88%;
+    --primary:            184 55% 46%;
+    --primary-foreground: 215 28% 8%;
+    --secondary:          215 20% 16%;
+    --secondary-foreground: 210 14% 75%;
+    --muted:              215 20% 16%;
+    --muted-foreground:   215 10% 50%;
+    --accent:             38 90% 55%;
+    --accent-foreground:  215 28% 8%;
+    --destructive:        0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border:             215 20% 20%;
+    --input:              215 20% 20%;
+    --ring:               184 55% 46%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; box-sizing: border-box; }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-inter);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3, h4 { font-weight: 600; line-height: 1.25; }
+}
+
+.kpi-value {
+  font-family: var(--font-mono);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
